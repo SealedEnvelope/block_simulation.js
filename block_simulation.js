@@ -50,12 +50,23 @@ var SE = (function(SE) {
       return counts;
     },
 
-    simulate: function(treatments, block_sizes, n, strata, reps) {
+    simulate: function(treatments, block_sizes, n, strata, reps, uneven) {
       var results = [];
+      var n_per_stratum;
       for (var i=0; i < reps; i++) {
         var sequence = [];
         for (var j=0; j < strata; j++) {
-          var n_per_stratum = Math.ceil((n - sequence.length) / (strata - j))
+          if (uneven) {
+            /* Early strata larger */
+            if ((strata - j) > 1) {
+              n_per_stratum = Math.ceil((n - sequence.length) / 2);
+            } else {
+              n_per_stratum = n - sequence.length;
+            }
+          } else {
+            /* Equal size strata */
+            n_per_stratum = Math.ceil((n - sequence.length) / (strata - j));
+          }
           sequence = sequence.concat(
             this.sequence(treatments, block_sizes, n_per_stratum)
           );
@@ -71,12 +82,12 @@ var SE = (function(SE) {
         if (typeof ideal[treatments[i]] == "undefined") {
           ideal[treatments[i]] = 0;
         }
-        ideal[treatments[i]] += n / treatments.length
+        ideal[treatments[i]] += n / treatments.length;
       }
       for (var i=0; i < results.length; i++) {
         delta = 0;
         for (var key in ideal) {
-          delta += Math.abs(results[i][key] - ideal[key])
+          delta += Math.abs(results[i][key] - ideal[key]);
         }
         diff.push(delta);
       }

@@ -52,6 +52,14 @@ $(function($) {
     equal(results[2].A + results[2].B, 50);
   });
 
+  test("Stratified simulation uneven strata", function() {
+    var results = SE.simulation.simulate(["A", "B"], [2, 4], 50, 7, 10, true);
+    equal(results.length, 10);
+    equal(results[0].A + results[0].B, 50);
+    equal(results[1].A + results[1].B, 50);
+    equal(results[2].A + results[2].B, 50);
+  });
+
   test("2:1 ratio", function() {
     var results = SE.simulation.simulate(["A", "A", "B"], [6], 18, 1, 10);
     equal(results.length, 10);
