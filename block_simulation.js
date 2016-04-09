@@ -38,6 +38,14 @@ var SE = (function(SE) {
       return sequence.slice(0, n);
     },
 
+    simple: function(treatments, n) {
+      var sequence = [];
+      while (sequence.length < n) {
+        sequence.push(treatments[Math.floor(treatments.length * Math.random())]);
+      }
+      return sequence;
+    },
+
     counts: function(sequence) {
       var counts = {};
       for (var i=0; i < sequence.length; i++) {
@@ -50,33 +58,65 @@ var SE = (function(SE) {
       return counts;
     },
 
-    simulate: function(treatments, block_sizes, n, strata, reps) {
-      var results = [];
-      for (var i=0; i < reps; i++) {
-        var sequence = [];
-        for (var j=0; j < strata; j++) {
-          var n_per_stratum = Math.ceil((n - sequence.length) / (strata - j))
-          sequence = sequence.concat(
-            this.sequence(treatments, block_sizes, n_per_stratum)
-          );
-        }
-        results.push(this.counts(sequence));
-      }
-      return results;
+    jitter: function(n, jitter) {
+      return n + Math.round(n * jitter * (Math.random() - 0.5));
     },
 
-    difference: function(results, treatments, n) {
-      var diff = [], ideal = [], delta;
-      for (var i=0; i < treatments.length; i++) {
-        if (typeof ideal[treatments[i]] == "undefined") {
-          ideal[treatments[i]] = 0;
+    simulate: function(treatments, block_sizes, n, strata, reps) {
+      var totals = [],
+          total1 = [],
+          total2 = [],
+          total3 = [],
+          n_per_stratum,
+          stratum;
+      for (var i=0; i < reps; i++) {
+        var sequence = [],
+            stratum1 = [],
+            simple = [],
+            simple1 = [];
+        for (var j=0; j < strata; j++) {
+          n_per_stratum = Math.ceil((n - sequence.length) / (strata - j));
+          if ((strata - j) > 1) {
+            /* Add some jitter */
+            n_per_stratum = this.jitter(n_per_stratum, 0.4);
+          }
+          stratum = this.sequence(treatments, block_sizes, n_per_stratum);
+          if (j % 2 === 0) {
+            stratum1 = stratum1.concat(stratum);
+          }
+          sequence = sequence.concat(stratum);
         }
-        ideal[treatments[i]] += n / treatments.length
+        simple = this.simple(treatments, n);
+        simple1 = this.simple(treatments, Math.ceil(n/2));
+        totals.push(this.counts(sequence));
+        total1.push(this.counts(stratum1));
+        total2.push(this.counts(simple));
+        total3.push(this.counts(simple1));
       }
+      return { totals: totals,
+               stratum1: total1,
+               simple: total2,
+               simple1: total3 };
+    },
+
+    difference: function(results, treatments) {
+      var diff = [], ideal = [], delta, total;
       for (var i=0; i < results.length; i++) {
+        total = 0;
+        ideal = [];
+        for (var key in results[i]) {
+          total += results[i][key];
+        }
+        for (var key in treatments) {
+          if (typeof ideal[treatments[key]] == "undefined") {
+            ideal[treatments[key]] = 0;
+          }
+          ideal[treatments[key]] += total / treatments.length;
+        }
         delta = 0;
         for (var key in ideal) {
-          delta += Math.abs(results[i][key] - ideal[key])
+          delta += Math.abs((results[i][key] || 0)
+                            - ideal[key]);
         }
         diff.push(delta);
       }
@@ -98,15 +138,18 @@ var SE = (function(SE) {
 
     frequency: function(list) {
       var counts = this.counts(list.sort(function(a,b) { return a - b; })),
-        freq = { "labels": [], "n": [], "percent": [] },
-        total = 0;
+          freq = { "labels": [], "n": [], "percent": [], "cum": [] },
+          total = 0,
+          cumtotal = 0;
       for (var key in counts) {
         total += counts[key];
       }
       for (var key in counts) {
+        cumtotal += counts[key];
         freq.labels.push(key);
         freq.n.push(counts[key]);
         freq.percent.push(Math.round(counts[key] * 1000 / total) / 10);
+        freq.cum.push(Math.round(cumtotal * 1000 / total) / 10);
       }
       return freq;
     },
@@ -117,6 +160,14 @@ var SE = (function(SE) {
         total += list[i];
       }
       return total/list.length;
+    },
+
+    RMS: function(differences) {
+      var I2 = [];
+      for (var i=0; i < differences.length; i++) {
+        I2.push(Math.pow(differences[i], 2));
+      }
+      return Math.pow(this.mean(I2), 0.5);
     }
 
   }
